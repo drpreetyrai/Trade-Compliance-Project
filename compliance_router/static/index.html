@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trade Compliance Router — Console</title>
+<style>
+  :root {
+    --bg: #0b1220; --panel: #131c2e; --panel-2: #1b2740; --border: #263451;
+    --text: #e6edf6; --muted: #8aa0c2; --accent: #4f8cff;
+    --green: #2ec26b; --red: #ff5470; --amber: #ffb43b;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.45;
+  }
+  header {
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    display: inline-block; margin-right: 6px; animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(46,194,107,.5); }
+    70% { box-shadow: 0 0 0 8px rgba(46,194,107,0); }
+    100% { box-shadow: 0 0 0 0 rgba(46,194,107,0); }
+  }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 12px 18px; cursor: pointer; color: var(--muted); font-size: 14px;
+    border-bottom: 2px solid transparent; user-select: none;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .wrap { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 0 0 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  input, select {
+    width: 100%; padding: 9px 10px; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: var(--mono);
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button.primary {
+    width: 100%; margin-top: 16px; padding: 11px; border: 0; border-radius: 9px;
+    background: var(--accent); color: white; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .presets button { width: auto; margin: 0; padding: 6px 10px; font-size: 12px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); border-radius: 7px; }
+  .presets button:hover { color: var(--text); border-color: var(--accent); }
+  .cfg { font-size: 12px; color: var(--muted); margin-top: 16px; font-family: var(--mono); }
+  .cfg b { color: var(--text); }
+
+  .feed { min-height: 420px; }
+  .feed-head { display: flex; justify-content: space-between; align-items: center; }
+  .ghost { width: auto; margin: 0; padding: 5px 10px; font-size: 12px; cursor: pointer; border-radius: 7px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+  .events { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center; }
+
+  .card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; animation: slidein .25s ease; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+  .card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: var(--panel-2); font-family: var(--mono); font-size: 13px; }
+  .card-head .oid { font-weight: 700; }
+  .card-head .meta { color: var(--muted); }
+  .card-head .final { margin-left: auto; }
+  .steps { padding: 6px 14px 12px; }
+  .step { display: flex; align-items: center; gap: 10px; padding: 7px 0;
+    border-bottom: 1px dashed var(--border); font-size: 13px; }
+  .step:last-child { border-bottom: 0; }
+  .step .seq { color: var(--muted); font-family: var(--mono); width: 26px; }
+  .step .node { font-family: var(--mono); width: 150px; color: var(--accent); }
+  .step .reason { color: var(--text); flex: 1; }
+  .ts { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+  .b-RECEIVED { background: rgba(79,140,255,.15); color: var(--accent); }
+  .b-PENDING { background: rgba(255,180,59,.15); color: var(--amber); }
+  .b-APPROVED { background: rgba(46,194,107,.15); color: var(--green); }
+  .b-BLOCKED { background: rgba(255,84,112,.15); color: var(--red); }
+
+  /* Test suite */
+  .suite-head { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+  .suite-head button { width: auto; margin: 0; }
+  .summary { display: flex; gap: 18px; margin-left: auto; font-size: 13px; font-family: var(--mono); }
+  .summary .ok { color: var(--green); } .summary .fail { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  td.mono, .scenario-desc { font-family: var(--mono); }
+  .scenario-desc { color: var(--muted); font-size: 12px; }
+  .res-PASS { color: var(--green); font-weight: 700; }
+  .res-FAIL { color: var(--red); font-weight: 700; }
+  .res-pending { color: var(--muted); }
+  tr.running { background: rgba(79,140,255,.06); }
+  .lat { font-family: var(--mono); color: var(--muted); }
+  .lat.warn { color: var(--amber); }
+  .raw-toggle { cursor: pointer; color: var(--accent); font-size: 12px; user-select: none; white-space: nowrap; }
+  .raw-toggle:hover { text-decoration: underline; }
+  tr.raw-row > td { padding: 0; border-bottom: 1px solid var(--border); }
+  tr.raw-row pre { margin: 0; padding: 12px 14px; background: #0c1424; color: var(--text);
+    font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    border-left: 3px solid var(--accent); }
+  .summary .lat-total { color: var(--muted); }
+
+  /* How to use */
+  .help { max-width: 920px; }
+  .help h2 { margin-top: 0; }
+  .help h3 { font-size: 14px; margin: 22px 0 8px; color: var(--text); }
+  .help p, .help li { color: var(--muted); font-size: 14px; }
+  .help ol, .help ul { padding-left: 20px; }
+  .help li { margin: 5px 0; }
+  .help b, .help strong { color: var(--text); }
+  .help code { font-family: var(--mono); background: var(--panel-2); padding: 1px 6px;
+    border-radius: 5px; color: var(--text); font-size: 13px; }
+  .help pre { background: #0c1424; border: 1px solid var(--border); border-radius: 9px;
+    padding: 12px 14px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px;
+    color: var(--text); border-left: 3px solid var(--accent); }
+  .help table td, .help table th { font-size: 13px; }
+  .steps-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 13px; margin: 8px 0 4px; }
+  .pill { background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px;
+    padding: 5px 10px; color: var(--accent); }
+  .arrow { color: var(--muted); }
+  .callout { background: rgba(79,140,255,.08); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 9px; padding: 12px 14px; margin: 16px 0; }
+  .callout p { color: var(--text); margin: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trade Compliance Router</h1>
+  <span class="sub"><span class="live-dot"></span>Console · deterministic · in-memory · LLM-free</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-view="route">Route Order</div>
+  <div class="tab" data-view="suite">Test Suite</div>
+  <div class="tab" data-view="help">How to Use</div>
+</div>
+
+<!-- ===================== ROUTE ORDER VIEW ===================== -->
+<div class="view active" id="view-route">
+  <div class="wrap">
+    <div class="panel">
+      <h2>Submit Trade Order</h2>
+      <form id="order-form">
+        <label>Order ID</label>
+        <input id="order_id" value="ORD-1001" required />
+        <div class="row">
+          <div>
+            <label>Asset Class</label>
+            <select id="asset_class">
+              <option value="crypto">crypto</option>
+              <option value="equity">equity</option>
+              <option value="forex">forex (unknown)</option>
+            </select>
+          </div>
+          <div>
+            <label>Symbol</label>
+            <input id="symbol" value="BTC" required />
+          </div>
+        </div>
+        <div class="row">
+          <div><label>Quantity</label><input id="quantity" type="number" step="any" value="1" required /></div>
+          <div><label>Price</label><input id="price" type="number" step="any" value="50000" required /></div>
+        </div>
+        <button type="submit" class="primary" id="submit-btn">Route Order ▸</button>
+      </form>
+
+      <div class="presets">
+        <button data-preset="crypto-ok">Crypto OK</button>
+        <button data-preset="crypto-block">Crypto Block</button>
+        <button data-preset="equity-ok">Equity OK</button>
+        <button data-preset="equity-block">Equity Block</button>
+        <button data-preset="dead">Dead-letter</button>
+        <button data-preset="invalid">Invalid</button>
+      </div>
+
+      <div class="cfg" id="cfg">Loading config…</div>
+    </div>
+
+    <div class="panel feed">
+      <div class="feed-head">
+        <h2 style="margin:0">Live State Transitions</h2>
+        <button class="ghost" id="clear-btn">Clear</button>
+      </div>
+      <div class="events" id="events">
+        <div class="empty" id="empty">No orders routed yet. Submit an order to see live graph-state transitions.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TEST SUITE VIEW ===================== -->
+<div class="view" id="view-suite">
+  <div style="padding: 20px 24px;">
+    <div class="panel">
+      <div class="suite-head">
+        <h2 style="margin:0">Scenario Test Suite</h2>
+        <button class="primary" id="run-all" style="width:auto; margin:0; padding:9px 18px;">Run all tests ▸</button>
+        <div class="summary" id="summary"><span class="res-pending">not run yet</span></div>
+      </div>
+      <p class="scenario-desc" style="margin:4px 0 0;">
+        Each scenario posts to <code>/api/orders</code> and checks the final status and routed node
+        against the expected outcome. Validation scenarios expect a rejected order.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Scenario</th><th>Input</th><th>Expected</th><th>Actual</th><th>Latency</th><th>Result</th><th></th></tr>
+        </thead>
+        <tbody id="suite-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== HOW TO USE VIEW ===================== -->
+<div class="view" id="view-help">
+  <div style="padding: 20px 24px;">
+    <div class="panel help">
+      <h2>How to Use This Application</h2>
+      <p>
+        This is a <b>low-latency, deterministic trade compliance router</b>. It ingests a raw
+        trade order, routes it through regulatory checks, and streams each internal graph-state
+        transition back in real time. No LLM and no database are involved — every decision is
+        explicit, programmatic, and runs entirely in-memory.
+      </p>
+
+      <h3>How an order flows</h3>
+      <div class="steps-flow">
+        <span class="pill">ingest</span><span class="arrow">→</span>
+        <span class="pill">crypto_compliance</span><span class="arrow">/</span>
+        <span class="pill">equity_compliance</span><span class="arrow">/</span>
+        <span class="pill">dead_letter</span><span class="arrow">→</span>
+        <span class="pill">APPROVED / BLOCKED</span>
+      </div>
+      <ul>
+        <li><b>Crypto</b> → <code>crypto_compliance</code>: BLOCKED if notional &gt; <b>$100,000</b> (volatility limit), else APPROVED.</li>
+        <li><b>Equity</b> → <code>equity_compliance</code>: APPROVED only if the symbol is in the in-memory market universe.</li>
+        <li><b>Anything else</b> → <code>dead_letter</code>: automatically BLOCKED (fail-safe).</li>
+      </ul>
+
+      <h3>Step 1 — Route a single order</h3>
+      <ol>
+        <li>Go to the <b>Route Order</b> tab.</li>
+        <li>Fill in the form, or click a <b>preset</b> (e.g. <i>Crypto Block</i>, <i>Dead-letter</i>).</li>
+        <li>Press <b>Route Order ▸</b> and watch each node appear live with its status badge,
+            reason, and timestamp.</li>
+      </ol>
+
+      <h3>Step 2 — Run the test suite</h3>
+      <ol>
+        <li>Go to the <b>Test Suite</b> tab.</li>
+        <li>Press <b>Run all tests ▸</b>. Each of the 8 scenarios is sent to the API and checked
+            against its expected outcome.</li>
+        <li>Review the <b>PASS/FAIL</b> grid, the <b>latency</b> per order, and click
+            <b>view raw</b> on any row to see the exact JSON the backend returned.</li>
+      </ol>
+
+      <h3>Example orders</h3>
+      <table>
+        <thead><tr><th>asset_class</th><th>symbol</th><th>qty × price</th><th>notional</th><th>Outcome</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">crypto</td><td class="mono">BTC</td><td class="mono">1 × 50,000</td><td class="mono">$50,000</td><td>✅ APPROVED</td></tr>
+          <tr><td class="mono">crypto</td><td class="mono">BTC</td><td class="mono">5 × 50,000</td><td class="mono">$250,000</td><td>⛔ BLOCKED — over limit</td></tr>
+          <tr><td class="mono">equity</td><td class="mono">AAPL</td><td class="mono">100 × 180</td><td class="mono">$18,000</td><td>✅ APPROVED</td></tr>
+          <tr><td class="mono">equity</td><td class="mono">ZZZZ</td><td class="mono">100 × 10</td><td class="mono">$1,000</td><td>⛔ BLOCKED — not available</td></tr>
+          <tr><td class="mono">forex</td><td class="mono">EURUSD</td><td class="mono">1000 × 1.1</td><td class="mono">$1,100</td><td>⛔ BLOCKED — dead-letter</td></tr>
+          <tr><td class="mono">crypto</td><td class="mono">BTC</td><td class="mono">0 × 100</td><td class="mono">—</td><td>⛔ REJECTED — invalid</td></tr>
+        </tbody>
+      </table>
+      <div class="callout"><p>The volatility boundary is exclusive: a crypto notional of
+        <b>exactly $100,000 is APPROVED</b> — only strictly greater is blocked.</p></div>
+
+      <h3>Call the API directly</h3>
+      <p>Route one order and get the final JSON result:</p>
+      <pre>curl -X POST http://127.0.0.1:8000/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"order_id":"C2","asset_class":"crypto","symbol":"BTC","quantity":5,"price":50000}'</pre>
+      <p>Stream the live state transitions as Server-Sent Events:</p>
+      <pre>curl -N -X POST http://127.0.0.1:8000/api/orders/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"order_id":"E1","asset_class":"equity","symbol":"AAPL","quantity":100,"price":180}'</pre>
+      <p>Endpoints: <code>GET /api/config</code> · <code>POST /api/orders</code> ·
+        <code>POST /api/orders/stream</code>.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let counter = 1001;
+const badge = (s) => `<span class="badge b-${s}">${s}</span>`;
+
+/* ---------- Tab switching ---------- */
+document.querySelectorAll(".tab").forEach((t) => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".view").forEach((x) => x.classList.remove("active"));
+    t.classList.add("active");
+    $("view-" + t.dataset.view).classList.add("active");
+  });
+});
+
+/* ---------- Config banner ---------- */
+async function loadConfig() {
+  try {
+    const c = await (await fetch("/api/config")).json();
+    $("cfg").innerHTML =
+      `Crypto volatility limit: <b>$${Number(c.crypto_volatility_limit).toLocaleString()}</b><br>` +
+      `Equity universe: <b>${c.equity_market_available.join(", ")}</b>`;
+  } catch { $("cfg").textContent = "Config unavailable"; }
+}
+loadConfig();
+
+/* ---------- Presets ---------- */
+const PRESETS = {
+  "crypto-ok":    { asset_class: "crypto", symbol: "BTC",    quantity: 1,    price: 50000 },
+  "crypto-block": { asset_class: "crypto", symbol: "BTC",    quantity: 5,    price: 50000 },
+  "equity-ok":    { asset_class: "equity", symbol: "AAPL",   quantity: 100,  price: 180 },
+  "equity-block": { asset_class: "equity", symbol: "ZZZZ",   quantity: 100,  price: 10 },
+  "dead":         { asset_class: "forex",  symbol: "EURUSD", quantity: 1000, price: 1.1 },
+  "invalid":      { asset_class: "crypto", symbol: "BTC",    quantity: 0,    price: 50000 },
+};
+document.querySelectorAll(".presets button").forEach((b) => {
+  b.addEventListener("click", () => {
+    const p = PRESETS[b.dataset.preset];
+    $("asset_class").value = ["crypto","equity"].includes(p.asset_class) ? p.asset_class : "forex";
+    $("symbol").value = p.symbol; $("quantity").value = p.quantity; $("price").value = p.price;
+    $("order_id").value = "ORD-" + (++counter);
+  });
+});
+
+$("clear-btn").addEventListener("click", () => {
+  $("events").innerHTML = '<div class="empty">Cleared. Submit an order to see live transitions.</div>';
+});
+
+/* ---------- Stream one order into a card ---------- */
+async function streamOrder(order) {
+  const empty = $("events").querySelector(".empty");
+  if (empty) empty.remove();
+
+  const card = document.createElement("div");
+  card.className = "card";
+  const notional = (order.quantity * order.price).toLocaleString();
+  card.innerHTML =
+    `<div class="card-head">
+       <span class="oid">${order.order_id}</span>
+       <span class="meta">${order.asset_class} · ${order.symbol} · notional $${notional}</span>
+       <span class="final"></span>
+     </div><div class="steps"></div>`;
+  $("events").prepend(card);
+  const steps = card.querySelector(".steps");
+  const finalEl = card.querySelector(".final");
+
+  let lastStatus = "";
+  try {
+    const resp = await fetch("/api/orders/stream", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(order),
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, idx); buffer = buffer.slice(idx + 2);
+        const ev = (frame.match(/^event: (.+)$/m) || [])[1] || "message";
+        const dm = frame.match(/^data: (.+)$/m);
+        if (!dm) continue;
+        const data = JSON.parse(dm[1]);
+        if (ev === "transition") {
+          lastStatus = data.status;
+          const ts = (data.timestamp || "").split("T")[1]?.slice(0, 12) || "";
+          const step = document.createElement("div");
+          step.className = "step";
+          step.innerHTML =
+            `<span class="seq">#${data.sequence}</span>
+             <span class="node">${data.node}</span>${badge(data.status)}
+             <span class="reason">${data.reason}</span><span class="ts">${ts}</span>`;
+          steps.appendChild(step);
+        } else if (ev === "error") {
+          lastStatus = "BLOCKED";
+          steps.innerHTML =
+            `<div class="step"><span class="reason" style="color:var(--red)">Rejected — ${
+              data.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join("; ")}</span></div>`;
+        }
+      }
+    }
+    finalEl.innerHTML = badge(lastStatus || "RECEIVED");
+  } catch (err) {
+    finalEl.innerHTML = badge("BLOCKED");
+    steps.innerHTML += `<div class="step"><span class="reason" style="color:var(--red)">Request failed: ${err}</span></div>`;
+  }
+}
+
+$("order-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("submit-btn").disabled = true;
+  await streamOrder({
+    order_id: $("order_id").value.trim(),
+    asset_class: $("asset_class").value,
+    symbol: $("symbol").value.trim(),
+    quantity: parseFloat($("quantity").value),
+    price: parseFloat($("price").value),
+  });
+  $("submit-btn").disabled = false;
+  $("order_id").value = "ORD-" + (++counter);
+});
+
+/* ---------- Test suite ---------- */
+const SCENARIOS = [
+  { name: "Crypto under limit", order: { asset_class: "crypto", symbol: "BTC", quantity: 1, price: 50000 },
+    expect: { status: "APPROVED", routed_to: "crypto_compliance" } },
+  { name: "Crypto at limit (boundary)", order: { asset_class: "crypto", symbol: "BTC", quantity: 1, price: 100000 },
+    expect: { status: "APPROVED", routed_to: "crypto_compliance" } },
+  { name: "Crypto over limit", order: { asset_class: "crypto", symbol: "BTC", quantity: 5, price: 50000 },
+    expect: { status: "BLOCKED", routed_to: "crypto_compliance" } },
+  { name: "Equity available", order: { asset_class: "equity", symbol: "AAPL", quantity: 100, price: 180 },
+    expect: { status: "APPROVED", routed_to: "equity_compliance" } },
+  { name: "Equity unavailable", order: { asset_class: "equity", symbol: "ZZZZ", quantity: 10, price: 5 },
+    expect: { status: "BLOCKED", routed_to: "equity_compliance" } },
+  { name: "Unknown asset → dead-letter", order: { asset_class: "forex", symbol: "EURUSD", quantity: 1000, price: 1.1 },
+    expect: { status: "BLOCKED", routed_to: "dead_letter" } },
+  { name: "Case/whitespace normalized", order: { asset_class: "  EQUITY ", symbol: " aapl ", quantity: 1, price: 1 },
+    expect: { status: "APPROVED", routed_to: "equity_compliance" } },
+  { name: "Invalid (qty = 0) rejected", order: { asset_class: "crypto", symbol: "BTC", quantity: 0, price: 100 },
+    expect: { error: "invalid_order" } },
+];
+
+function buildSuiteTable() {
+  const body = $("suite-body");
+  body.innerHTML = "";
+  SCENARIOS.forEach((s, i) => {
+    const tr = document.createElement("tr");
+    tr.id = "sc-" + i;
+    const inp = `${s.order.asset_class.trim()} ${s.order.symbol.trim()} · ${s.order.quantity}×${s.order.price}`;
+    const exp = s.expect.error ? "rejected" : `${s.expect.status} / ${s.expect.routed_to}`;
+    tr.innerHTML =
+      `<td>${s.name}</td><td class="mono">${inp}</td>
+       <td class="mono">${exp}</td>
+       <td class="mono actual">—</td>
+       <td class="lat lat-cell">—</td>
+       <td class="result res-pending">pending</td>
+       <td><span class="raw-toggle" data-i="${i}" style="visibility:hidden">view raw ▾</span></td>`;
+    body.appendChild(tr);
+
+    // Hidden detail row holding the raw API response.
+    const raw = document.createElement("tr");
+    raw.id = "raw-" + i;
+    raw.className = "raw-row";
+    raw.style.display = "none";
+    raw.innerHTML = `<td colspan="7"><pre></pre></td>`;
+    body.appendChild(raw);
+  });
+
+  body.querySelectorAll(".raw-toggle").forEach((t) => {
+    t.addEventListener("click", () => {
+      const rawRow = $("raw-" + t.dataset.i);
+      const open = rawRow.style.display !== "none";
+      rawRow.style.display = open ? "none" : "table-row";
+      t.textContent = open ? "view raw ▾" : "hide raw ▴";
+    });
+  });
+}
+buildSuiteTable();
+
+async function runScenario(s, i) {
+  const tr = $("sc-" + i);
+  tr.classList.add("running");
+  const actualCell = tr.querySelector(".actual");
+  const latCell = tr.querySelector(".lat-cell");
+  const resultCell = tr.querySelector(".result");
+  const toggle = tr.querySelector(".raw-toggle");
+  const rawPre = $("raw-" + i).querySelector("pre");
+  let actual, pass, body, ms = 0;
+  try {
+    const order = { order_id: "TEST-" + i + "-" + (++counter), ...s.order };
+    const t0 = performance.now();
+    body = await (await fetch("/api/orders", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(order),
+    })).json();
+    ms = performance.now() - t0;
+    if (s.expect.error) {
+      actual = body.error ? "rejected" : `${body.status} / ${body.routed_to}`;
+      pass = body.error === s.expect.error;
+    } else {
+      actual = body.error ? `error: ${body.error}` : `${body.status} / ${body.routed_to}`;
+      pass = body.status === s.expect.status && body.routed_to === s.expect.routed_to;
+    }
+  } catch (err) { actual = "request failed"; pass = false; body = { error: String(err) }; }
+
+  actualCell.textContent = actual;
+  latCell.textContent = ms ? `${ms.toFixed(1)} ms` : "—";
+  latCell.classList.toggle("warn", ms > 50);
+  resultCell.textContent = pass ? "PASS" : "FAIL";
+  resultCell.className = "result " + (pass ? "res-PASS" : "res-FAIL");
+  rawPre.textContent = JSON.stringify(body, null, 2);
+  toggle.style.visibility = "visible";
+  tr.classList.remove("running");
+  return { pass, ms };
+}
+
+$("run-all").addEventListener("click", async () => {
+  $("run-all").disabled = true;
+  buildSuiteTable();
+  $("summary").innerHTML = '<span class="res-pending">running…</span>';
+  let passed = 0, totalMs = 0;
+  for (let i = 0; i < SCENARIOS.length; i++) {
+    const { pass, ms } = await runScenario(SCENARIOS[i], i);
+    if (pass) passed++;
+    totalMs += ms;
+  }
+  const failed = SCENARIOS.length - passed;
+  const avg = (totalMs / SCENARIOS.length).toFixed(1);
+  $("summary").innerHTML =
+    `<span class="ok">✔ ${passed} passed</span>` +
+    (failed ? `<span class="fail">✘ ${failed} failed</span>` : `<span class="fail" style="color:var(--muted)">0 failed</span>`) +
+    `<span class="lat-total">⌀ ${avg} ms/order</span>`;
+  $("run-all").disabled = false;
+});
+</script>
+</body>
+</html>

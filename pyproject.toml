@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compliance-router"
+version = "1.0.0"
+description = "Low-latency, deterministic financial trade compliance router built on LangGraph."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+web = ["fastapi>=0.104", "uvicorn>=0.24"]
+
+[project.scripts]
+compliance-router = "compliance_router.__main__:main"
+compliance-router-web = "compliance_router.web:main"
+
+[tool.setuptools]
+packages = ["compliance_router"]
+
+[tool.setuptools.package-data]
+compliance_router = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
