@@ -1,4 +1,5 @@
 # Financial Trade Compliance Router
+![alt text](img1.png)
 
 A low-latency, **deterministic** trade compliance router built on
 [LangGraph](https://langchain-ai.github.io/langgraph/). It ingests raw trade
